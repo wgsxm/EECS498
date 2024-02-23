@@ -112,7 +112,9 @@ def rnn_step_forward(x, prev_h, Wx, Wh, b):
     # and cache variables respectively.
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    i = (x @ Wx + prev_h @ Wh + b)
+    next_h = torch.tanh(i)
+    cache = (x, prev_h, Wx, Wh, i)
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -142,7 +144,13 @@ def rnn_step_backward(dnext_h, cache):
     # terms of the output value from tanh.
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    x, prev_h, Wx, Wh, i = cache
+    di = (1 - torch.tanh(i) ** 2) * dnext_h
+    db = di.sum(dim=0)
+    dWx = x.T @ di
+    dx = di @ Wx.T
+    dWh = prev_h.T @ di
+    dprev_h = di @ Wh.T
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -174,7 +182,16 @@ def rnn_forward(x, h0, Wx, Wh, b):
     # above. You can use a for loop to help compute the forward pass.
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    N, T, D = x.shape
+    H = h0.shape[1]
+    h = []
+    cache = []
+    for i in range(T):
+        h0, c = rnn_step_forward(x[:, i, :], h0, Wx, Wh, b)
+        h.append(h0)
+        cache.append(c)
+    h = (torch.stack(h)).permute(1, 0, 2)
+    assert h.shape == (N, T, H)
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -207,7 +224,23 @@ def rnn_backward(dh, cache):
     # defined above. You can use a for loop to help compute the backward pass.
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    N, T, H = dh.shape
+    dh_t = torch.zeros_like(dh[:, 0, :])
+    dx = []
+    dWx = torch.zeros_like(cache[0][2])
+    dWh = torch.zeros_like(cache[0][3])
+    db = torch.zeros_like(cache[0][4])
+    for i in range(T):
+        dh_t += dh[:, T - i - 1, :]
+        dx_t, dh_t, dWx_t, dWh_t, db_t = rnn_step_backward(dh_t, cache[T - i - 1])
+        dx.append(dx_t)
+        dWx += dWx_t
+        dWh += dWh_t
+        db += db_t
+    dx.reverse()
+    dx = torch.stack(dx).permute(1, 0, 2)
+    assert dx.shape == (N, T, dWx.shape[0])
+    dh0 = dh_t
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
