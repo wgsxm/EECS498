@@ -333,7 +333,7 @@ class WordEmbedding(nn.Module):
         # TODO: Implement the forward pass for word embeddings.
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        out = self.W_embed[x]
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
@@ -378,7 +378,9 @@ def temporal_softmax_loss(x, y, ignore_index=None):
     # all timesteps and *averaging* across the minibatch.
     ##########################################################################
     # Replace "pass" statement with your code
-    pass
+    loss = torch.nn.functional.cross_entropy(
+        x.permute(0, 2, 1), y, ignore_index=ignore_index, reduction="sum"
+    ) / x.shape[0]
     ##########################################################################
     #                             END OF YOUR CODE                           #
     ##########################################################################
@@ -449,7 +451,13 @@ class CaptioningRNN(nn.Module):
         # (2) feature projection (from CNN pooled feature to h0)
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        self.word_embedding = WordEmbedding(vocab_size, wordvec_dim)
+        self.output_projection = nn.Linear(hidden_dim, vocab_size)
+        self.image_encoder = ImageEncoder()
+        self.n = nn.Linear(16, 1)
+        self.feature_projection = nn.Linear(input_dim, hidden_dim)
+        if self.cell_type == 'rnn':
+            self.network = RNN(wordvec_dim, hidden_dim)
         ######################################################################
         #                            END OF YOUR CODE                        #
         ######################################################################
@@ -500,7 +508,17 @@ class CaptioningRNN(nn.Module):
         # Do not worry about regularizing the weights or their gradients!
         ######################################################################
         # Replace "pass" statement with your code
-        pass
+        if self.cell_type == 'rnn':
+            features = self.image_encoder(images)
+            N, D, _, _ = features.shape
+            features = features.view(N, D, -1)
+            features = self.n(features)
+            features = features.view(N, D)
+            h0 = self.feature_projection(features)
+            word_vectors_in = self.word_embedding(captions_in)
+            h = self.network(word_vectors_in, h0)
+            scores = self.output_projection(h)
+            loss = temporal_softmax_loss(scores, captions_out, ignore_index=self.ignore_index)
         ######################################################################
         #                           END OF YOUR CODE                         #
         ######################################################################
